@@ -3,41 +3,29 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
-#ifndef SCREEN_WIDTH
-#define SCREEN_WIDTH    848
-#endif
-#ifndef SCREEN_HEIGHT
-#define SCREEN_HEIGHT   480
-#endif
-
-#define VRAM_SIZE_WORDS 0x100000
-#define VRAM_ADDR_MASK  ((VRAM_SIZE_WORDS-1))
-
-static uint16_t vram[VRAM_SIZE_WORDS];
+#include "xosera.h"
 
 static uint32_t palette_a[256];
 static uint32_t palette_b[256];
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
-static SDL_Texture *buffer_a, *buffer_b;
+static SDL_Texture *buffer_a;
 
 static uint32_t last_frame_ticks;
 static volatile bool quit = false;
 
+static uint16_t xosera_vram[VRAM_SIZE_WORDS];
+
+//////// EXTERNALLY-VISIBLE / MODIFIABLE STATE
 // only 1, 2 or 4
-static int pixel_width = 4;
-static int pixel_height = 4;
+static volatile int pixel_width = 4;
+static volatile int pixel_height = 4;
+
+static volatile uint32_t pfa_videobase;
+static volatile uint32_t pfb_videobase;
 
 static volatile bool in_vblank;
-
-static inline __attribute__((always_inline)) uint16_t vram_fetch(uint16_t addr) {
-    return vram[addr & VRAM_ADDR_MASK];
-}
-
-static inline __attribute__((always_inline)) void vram_write(uint16_t addr, uint16_t value) {
-    vram[addr & VRAM_ADDR_MASK] = value;
-}
 
 static bool init_sdl() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -68,35 +56,23 @@ static bool init_sdl() {
         return false;
     }
 
-    buffer_b = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
-    if (!buffer_b) {
-        printf("sdl texture create failed for buffer a\n");
-        SDL_DestroyTexture(buffer_a);
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return false;
-    }
-
     return true;
-}
-
-static inline void draw_native_pixel_row(uint32_t *pixel_ptr, uint32_t left_idx, uint32_t color) {
-    pixel_ptr[left_idx] = color;
-    
-    if (pixel_width > 1) {  // at least 2
-        pixel_ptr[left_idx + 1] = color;
-    }
-    if (pixel_width > 2) {   // must be 4
-        pixel_ptr[left_idx + 2] = color;
-        pixel_ptr[left_idx + 3] = color;
-    }
 }
 
 #define SCREEN_TO_NATIVE_X(screen)      ((screen / pixel_width))
 #define SCREEN_TO_NATIVE_Y(screen)      ((screen / pixel_height))
 
-static void xo_redraw(SDL_Texture *buffer, uint32_t *palette) {
+#define VRAM_WORD_TO_PIXEL(x, word)     (((x & 1) ? word >> 8 : word & 0xff))
+
+static inline __attribute__((always_inline)) uint16_t vram_fetch(uint16_t addr) {
+    return xosera_vram[addr & VRAM_ADDR_MASK];
+}
+
+static inline __attribute__((always_inline)) void vram_write(uint16_t addr, uint16_t value) {
+    xosera_vram[addr & VRAM_ADDR_MASK] = value;
+}
+
+static void xo_redraw(SDL_Texture *buffer, uint32_t *palette_a, uint32_t *palette_b) {
     void *pixels;
     int pitch;
 
@@ -111,14 +87,26 @@ static void xo_redraw(SDL_Texture *buffer, uint32_t *palette) {
 
     for (int y = 0; y < SCREEN_HEIGHT; y++) {
         for (int x = 0; x < SCREEN_WIDTH; x++) {
-            int native_x = SCREEN_TO_NATIVE_X(x);
-            int vram_addr = ((SCREEN_TO_NATIVE_Y(y) * SCREEN_TO_NATIVE_Y(SCREEN_WIDTH)) / sizeof(uint16_t)) + (SCREEN_TO_NATIVE_X(x) / sizeof(uint16_t));
-            
             // TODO Copper
 
-            uint16_t vram_value = vram_fetch(vram_addr);
-            pixel_ptr[(y * pitch_longs) + x] = palette[(native_x & 1) ? vram_value >> 8 : vram_value & 0xff];
+            int native_x = SCREEN_TO_NATIVE_X(x);
+            int vram_offset = ((SCREEN_TO_NATIVE_Y(y) * SCREEN_TO_NATIVE_Y(SCREEN_WIDTH)) / sizeof(uint16_t)) + (SCREEN_TO_NATIVE_X(x) / sizeof(uint16_t));
+            int vram_addr_a = pfa_videobase + vram_offset;
+            int vram_addr_b = pfb_videobase + vram_offset;
+            
 
+            uint16_t vram_value_a = vram_fetch(vram_addr_a);
+            uint16_t vram_value_b = vram_fetch(vram_addr_b);
+
+            uint8_t pixel_a = VRAM_WORD_TO_PIXEL(native_x, vram_value_a);
+            uint8_t pixel_b = VRAM_WORD_TO_PIXEL(native_x, vram_value_b);
+
+            // TODO different combines
+            uint32_t color_a = palette_a[pixel_a];
+            uint32_t color_b = palette_b[pixel_b];
+            uint32_t color = color_a ^ color_b;
+
+            pixel_ptr[(y * pitch_longs) + x] = color;
         }        
         // TODO HBLANK
     }
@@ -137,7 +125,7 @@ static int redraw_thread(void *data) {
 
         in_vblank = false;
 
-        xo_redraw(buffer_a, palette_a);
+        xo_redraw(buffer_a, palette_a, palette_b);
 
         in_vblank = true;
 
@@ -157,17 +145,10 @@ int main() {
         return 1;
     }
 
-    SDL_Thread *thread = SDL_CreateThread(redraw_thread, "RedrawThread", NULL);
-    if (!thread) {
-        printf("SDL_CreateThread failed: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    SDL_Event e;
-
-    palette_a[1] = 0xffffffff;
+    // PFA test pattern
+    palette_a[1] = 0xff0000ff;
     uint32_t pix_val = 0x0001;
-    for (int i = 0; i < VRAM_SIZE_WORDS; i++) {
+    for (int i = 0; i < 0xc6c0; i++) {
         if (i % (SCREEN_TO_NATIVE_X(SCREEN_WIDTH) / 2) == 0) {
             if (pix_val == 0x0001) {
                 pix_val = 0x0100;
@@ -176,17 +157,33 @@ int main() {
             }
         }
 
-        vram[i] = pix_val;
+        xosera_vram[i] = pix_val;
     }
 
-    for (int i = 0; i < 53; i++) {
-        printf("%d%d", vram[i] >> 8, vram[i] & 0xf);
+    // PFB test pattern
+    palette_b[1] = 0x00ff00ff;
+    pix_val = 0x0100;
+    for (int i = 0xc6c0; i < 0x18d80; i++) {
+        if (i % (SCREEN_TO_NATIVE_X(SCREEN_WIDTH) / 2) == 0) {
+            if (pix_val == 0x0001) {
+                pix_val = 0x0100;
+            } else {
+                pix_val = 0x0001;
+            }
+        }
+
+        xosera_vram[i] = pix_val;
     }
-    printf("\n");
-    for (int i = 53; i < 106; i++) {
-        printf("%d%d", vram[i] >> 8, vram[i] & 0xf);
+
+    pfb_videobase = 0xc6c0;
+
+    SDL_Thread *thread = SDL_CreateThread(redraw_thread, "RedrawThread", NULL);
+    if (!thread) {
+        printf("SDL_CreateThread failed: %s\n", SDL_GetError());
+        return -1;
     }
-    printf("\n");
+
+    SDL_Event e;
 
     while (!quit) {
         while (SDL_PollEvent(&e) != 0) {
@@ -198,7 +195,6 @@ int main() {
 
     SDL_WaitThread(thread, NULL);
     SDL_DestroyTexture(buffer_a);
-    SDL_DestroyTexture(buffer_b);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

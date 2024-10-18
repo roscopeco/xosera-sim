@@ -72,17 +72,7 @@ static inline __attribute__((always_inline)) void vram_write(uint16_t addr, uint
     xosera_vram[addr & VRAM_ADDR_MASK] = value;
 }
 
-static void xo_redraw(SDL_Texture *buffer, uint32_t *palette_a, uint32_t *palette_b) {
-    void *pixels;
-    int pitch;
-
-    if (SDL_LockTexture(buffer, NULL, &pixels, &pitch) < 0) {
-        printf("SDL_LockTexture failed: %s\n", SDL_GetError());
-        return;
-    }
-
-    uint32_t *pixel_ptr = (uint32_t *)pixels;
-
+static void xo_redraw(uint32_t *pixels, uint32_t pitch, uint32_t *palette_a, uint32_t *palette_b) {
     int pitch_longs = (pitch / 4);
 
     for (int y = 0; y < SCREEN_HEIGHT; y++) {
@@ -106,26 +96,33 @@ static void xo_redraw(SDL_Texture *buffer, uint32_t *palette_a, uint32_t *palett
             uint32_t color_b = palette_b[pixel_b];
             uint32_t color = color_a ^ color_b;
 
-            pixel_ptr[(y * pitch_longs) + x] = color;
+            pixels[(y * pitch_longs) + x] = color;
         }        
         // TODO HBLANK
     }
-
-    SDL_UnlockTexture(buffer);
-    SDL_RenderCopy(renderer, buffer, NULL, NULL);
-    SDL_RenderPresent(renderer);
-
-    // TODO VBLANK
 }
 
 static int redraw_thread(void *data) {
     const int frame_delay = 16; // 16ms for 60Hz
+
+    uint32_t *pixel_ptr;
+    int pitch;
+
     while (!quit) {
         uint32_t start_ticks = SDL_GetTicks();
 
         in_vblank = false;
 
-        xo_redraw(buffer_a, palette_a, palette_b);
+        if (SDL_LockTexture(buffer_a, NULL, (void*)&pixel_ptr, &pitch) < 0) {
+            printf("SDL_LockTexture failed: %s\n", SDL_GetError());
+            return -1;
+        }
+    
+        xo_redraw(pixel_ptr, pitch, palette_a, palette_b);
+
+        SDL_UnlockTexture(buffer_a);
+        SDL_RenderCopy(renderer, buffer_a, NULL, NULL);
+        SDL_RenderPresent(renderer);
 
         in_vblank = true;
 

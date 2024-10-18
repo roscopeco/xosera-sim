@@ -10,7 +10,7 @@ static uint32_t palette_b[256];
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
-static SDL_Texture *buffer_a;
+static SDL_Texture *buffer;
 
 static uint32_t last_frame_ticks;
 static volatile bool quit = false;
@@ -47,8 +47,8 @@ static bool init_sdl() {
         return false;
     }
 
-    buffer_a = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
-    if (!buffer_a) {
+    buffer = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
+    if (!buffer) {
         printf("sdl texture create failed for buffer a\n");
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
@@ -113,15 +113,15 @@ static int redraw_thread(void *data) {
 
         in_vblank = false;
 
-        if (SDL_LockTexture(buffer_a, NULL, (void*)&pixel_ptr, &pitch) < 0) {
+        if (SDL_LockTexture(buffer, NULL, (void*)&pixel_ptr, &pitch) < 0) {
             printf("SDL_LockTexture failed: %s\n", SDL_GetError());
             return -1;
         }
     
         xo_redraw(pixel_ptr, pitch, palette_a, palette_b);
 
-        SDL_UnlockTexture(buffer_a);
-        SDL_RenderCopy(renderer, buffer_a, NULL, NULL);
+        SDL_UnlockTexture(buffer);
+        SDL_RenderCopy(renderer, buffer, NULL, NULL);
         SDL_RenderPresent(renderer);
 
         in_vblank = true;
@@ -191,7 +191,7 @@ int main() {
     }
 
     SDL_WaitThread(thread, NULL);
-    SDL_DestroyTexture(buffer_a);
+    SDL_DestroyTexture(buffer);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

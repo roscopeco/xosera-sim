@@ -1,5 +1,5 @@
-CFLAGS=-Iinclude -I/opt/homebrew/include -g
-LDFLAGS=-L/opt/homebrew/lib -lSDL2 -g
+CFLAGS=$(shell pkg-config --cflags sdl2) -Iinclude -g
+LDFLAGS=$(shell pkg-config --libs sdl2)
 
 all: main
 

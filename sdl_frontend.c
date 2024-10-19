@@ -12,14 +12,21 @@
 #include <SDL2/SDL.h>
 
 #include "xosera.h"
+#include "sdl_frontend.h"
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *buffer;
+static Xosera xosera;
 
 static volatile bool quit = false;
 
 bool sdl_frontend_init() {
+    if (!init_xosera(&xosera)) {
+        printf("Xosera init failed, bailing...\n");
+        return 1;
+    }
+
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         printf("SDL init failed\n");
         return false;
@@ -51,14 +58,13 @@ bool sdl_frontend_init() {
     return true;
 }
 
-static int SDL_redraw_thread(void *data) {
+static int sdl_redraw(Xosera *xosera) {
     const int frame_delay = 16; // 16ms for 60Hz
 
     uint32_t *pixel_ptr;
     int pitch;
-    Xosera *xosera = (Xosera*)data;
 
-    while (!quit) {
+    // while (!quit) {
         uint32_t start_ticks = SDL_GetTicks();
 
         xosera->in_vblank = false;
@@ -82,16 +88,20 @@ static int SDL_redraw_thread(void *data) {
             // TODO delay metrics
             SDL_Delay(delay & 0xf);
         }
-    }
+    // }
 
     return 0;
 }
 
-int sdl_frontend_run(Xosera *xosera) {
-    SDL_Thread *thread = SDL_CreateThread(SDL_redraw_thread, "RedrawThread", xosera);
-    if (!thread) {
-        printf("SDL_CreateThread failed: %s\n", SDL_GetError());
-        return -1;
+int sdl_frontend_run(SDLFrontendMainFunc main_func) {
+    SDL_Thread *thread = NULL;
+
+    if (main_func != NULL) {
+        thread = SDL_CreateThread((SDL_ThreadFunction)main_func, "XoseraMainThread", &xosera);
+        if (!thread) {
+            printf("SDL_CreateThread failed: %s\n", SDL_GetError());
+            return -1;
+        }
     }
 
     SDL_Event e;
@@ -102,13 +112,22 @@ int sdl_frontend_run(Xosera *xosera) {
                 quit = true;
             }
         }
+
+        sdl_redraw(&xosera);
     }
 
-    SDL_WaitThread(thread, NULL);
+    if (thread != NULL) {
+        SDL_WaitThread(thread, NULL);
+    }
+
     SDL_DestroyTexture(buffer);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
 
     return 0;
+}
+
+bool sdl_frontend_isQuit() {
+    return quit;
 }

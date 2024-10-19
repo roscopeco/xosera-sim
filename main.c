@@ -9,11 +9,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "xosera.h"
 #include "sdl_frontend.h"
 
 static void xosera_setup_test(Xosera *xosera);
+static int main_thread_func(Xosera *xosera);
 
 int main() {
     if (!sdl_frontend_init()) {
@@ -21,17 +23,19 @@ int main() {
         return 1;
     }
 
-    Xosera xosera;
-    if (!init_xosera(&xosera)) {
-        printf("Xosera init failed, bailing...\n");
+    if (sdl_frontend_run(main_thread_func) != 0) {
+        printf("ERROR: run failed\n");
         return 1;
     }
 
-    xosera_setup_test(&xosera);
+    return 0;
+}
 
-    if (sdl_frontend_run(&xosera) != 0) {
-        printf("ERROR: run failed\n");
-        return 1;
+static int main_thread_func(Xosera *xosera) {
+    xosera_setup_test(xosera);
+
+    while (!sdl_frontend_isQuit()) {
+        usleep(100);
     }
 
     return 0;

@@ -16,16 +16,15 @@ void xo_redraw(Xosera *xosera, uint32_t *pixels, uint32_t pitch) {
 
     for (int y = 0; y < SCREEN_HEIGHT; y++) {
         for (int x = 0; x < SCREEN_WIDTH; x++) {
-            // TODO Copper
+            xo_copper_pixel(xosera, x, y);
 
             int native_x = SCREEN_TO_NATIVE_X(xosera, x);
             int vram_offset = ((SCREEN_TO_NATIVE_Y(xosera, y) * SCREEN_TO_NATIVE_Y(xosera, SCREEN_WIDTH)) / sizeof(uint16_t)) + (SCREEN_TO_NATIVE_X(xosera, x) / sizeof(uint16_t));
             int vram_addr_a = xosera->pfa_videobase + vram_offset;
-            int vram_addr_b = xosera->pfb_videobase + vram_offset;
-            
+            int vram_addr_b = xosera->pfb_videobase + vram_offset;            
 
-            uint16_t vram_value_a = vram_fetch(vram, vram_addr_a);
-            uint16_t vram_value_b = vram_fetch(vram, vram_addr_b);
+            uint16_t vram_value_a = xo_vram_read(vram, vram_addr_a);
+            uint16_t vram_value_b = xo_vram_read(vram, vram_addr_b);
 
             uint8_t pixel_a = VRAM_WORD_TO_PIXEL(native_x, vram_value_a);
             uint8_t pixel_b = VRAM_WORD_TO_PIXEL(native_x, vram_value_b);

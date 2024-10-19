@@ -11,7 +11,7 @@
 
 #include "xosera.h"
 
-bool init_xosera(Xosera *xosera) {
+bool xo_init(Xosera *xosera) {
     xosera->in_vblank = false;
     xosera->pfa_videobase = 0;
     xosera->pfb_videobase = 0;

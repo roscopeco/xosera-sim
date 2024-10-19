@@ -22,7 +22,7 @@ static Xosera xosera;
 static volatile bool quit = false;
 
 bool sdl_frontend_init() {
-    if (!init_xosera(&xosera)) {
+    if (!xo_init(&xosera)) {
         printf("Xosera init failed, bailing...\n");
         return 1;
     }

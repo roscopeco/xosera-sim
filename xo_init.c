@@ -15,7 +15,7 @@ static void init_xm_regs(Xosera *xosera);
 static void init_xr_regs(Xosera *xosera);
 
 bool xo_init(Xosera *xosera) {
-    memset(xosera->vram, 0, VRAM_SIZE_WORDS);
+    memset(xosera->vram, 0, VRAM_SIZE_WORDS * sizeof(uint16_t));
 
     xosera->in_vblank = false;
     xosera->pfa_videobase = 0;

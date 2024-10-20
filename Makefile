@@ -11,12 +11,14 @@ LDFLAGS=$(shell pkg-config --libs sdl2)
 
 .PHONY: all test clean
 
-all: test main
+all: check main
+
+check: test
 
 test:
 	$(MAKE) -C test test
 	
-main: main.o xosera.o xo_scanout.o xo_copper.o sdl_frontend.o
+main: main.o xo_init.o xo_scanout.o xo_copper.o sdl_frontend.o
 
 clean: 
 	rm -rf *.o main

@@ -34,13 +34,62 @@ inline void xo_bus_write_xr_reg_8_l(__attribute__((unused)) Xosera *xosera, __at
 }
 
 uint8_t xo_bus_read_xm_reg_8_u(__attribute__((unused)) Xosera *xosera, __attribute__((unused)) XO_XM_REG_TYPE reg) {
-    return 0;
+    switch (reg) {
+        case XM_SYS_CTRL:
+        case XM_INT_CTRL:
+        case XM_TIMER:
+        case XM_RD_XADDR:
+        case XM_WR_XADDR:
+        case XM_RD_INCR:
+        case XM_RD_ADDR:
+        case XM_WR_INCR:
+        case XM_WR_ADDR:
+            return WORD_UPPER_BYTE(xosera->xm_regs[reg]);
+        case XM_PIXEL_X:
+        case XM_PIXEL_Y:
+            DEBUGF("WARN: Read from write-only XM register 0x%04x\n", reg);
+            return 0;
+        case XM_XDATA:
+            return 0;
+        case XM_DATA:
+        case XM_DATA_2:
+            return 0;
+        case XM_UART:
+            DEBUGF("WARN: Write to unimplemented XM register 0x%04x\n", reg);
+            return 0;
+        case XM_FEATURE:
+            return WORD_UPPER_BYTE(XOSERA_SIM_FEATURES);
+    }
 }
 
 uint8_t xo_bus_read_xm_reg_8_l(__attribute__((unused)) Xosera *xosera, __attribute__((unused)) XO_XM_REG_TYPE reg) {
-    return 0;
+    switch (reg) {
+        case XM_SYS_CTRL:
+        case XM_INT_CTRL:
+        case XM_TIMER:
+        case XM_RD_XADDR:
+        case XM_WR_XADDR:
+        case XM_RD_INCR:
+        case XM_RD_ADDR:
+        case XM_WR_INCR:
+        case XM_WR_ADDR:
+            return WORD_LOWER_BYTE(xosera->xm_regs[reg]);
+        case XM_PIXEL_X:
+        case XM_PIXEL_Y:
+            DEBUGF("WARN: Read from write-only XM register 0x%04x\n", reg);
+            return 0;
+        case XM_XDATA:
+            return 0;
+        case XM_DATA:
+        case XM_DATA_2:
+            return 0;
+        case XM_UART:
+            DEBUGF("WARN: Write to unimplemented XM register 0x%04x\n", reg);
+            return 0;
+        case XM_FEATURE:
+            return WORD_LOWER_BYTE(XOSERA_SIM_FEATURES);
+    }
 }
-
 
 void xo_bus_write_xm_reg_8_u(__attribute__((unused)) Xosera *xosera, __attribute__((unused)) XO_XM_REG_TYPE reg, __attribute__((unused)) uint8_t value) {
 }

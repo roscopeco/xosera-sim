@@ -60,6 +60,8 @@ uint8_t xo_bus_read_xm_reg_8_u(__attribute__((unused)) Xosera *xosera, __attribu
         case XM_FEATURE:
             return WORD_UPPER_BYTE(XOSERA_SIM_FEATURES);
     }
+
+    return 0;
 }
 
 uint8_t xo_bus_read_xm_reg_8_l(__attribute__((unused)) Xosera *xosera, __attribute__((unused)) XO_XM_REG_TYPE reg) {
@@ -89,6 +91,8 @@ uint8_t xo_bus_read_xm_reg_8_l(__attribute__((unused)) Xosera *xosera, __attribu
         case XM_FEATURE:
             return WORD_LOWER_BYTE(XOSERA_SIM_FEATURES);
     }
+
+    return 0;
 }
 
 void xo_bus_write_xm_reg_8_u(__attribute__((unused)) Xosera *xosera, __attribute__((unused)) XO_XM_REG_TYPE reg, __attribute__((unused)) uint8_t value) {
@@ -139,6 +143,8 @@ uint16_t xo_bus_read_xm_reg_16(Xosera *xosera, XO_XM_REG_TYPE reg) {
         case XM_FEATURE:
             return XOSERA_SIM_FEATURES;
     }
+
+    return 0;
 }
 
 void xo_bus_write_xm_reg_16(Xosera *xosera, XO_XM_REG_TYPE reg, uint16_t value) {

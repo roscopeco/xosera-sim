@@ -6,7 +6,7 @@
 # See LICENSE.md for legal jargon.
 #
 
-CFLAGS=$(shell pkg-config --cflags sdl2) -Iinclude -g -Wall -Wextra -Werror
+CFLAGS=$(shell pkg-config --cflags sdl2) -Iinclude -g -Wall -Wextra -Werror -Wpedantic
 LDFLAGS=$(shell pkg-config --libs sdl2)
 
 .PHONY: all test clean

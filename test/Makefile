@@ -1,4 +1,4 @@
-CFLAGS=-Iinclude -I../include -g -Wall -Wextra -Werror
+CFLAGS=-Iinclude -I../include -g -Wall -Wextra -Werror -Wpedantic
 LDFLAGS=
 
 TEST_BINARIES=$(patsubst test_%.c,test_%,$(wildcard test_*.c))
